@@ -38,6 +38,8 @@ class MessagesViewController: UIViewController, CollectionDataProviderDelegate, 
         dataProvider.delegate = self
 
         userDataProvider.setData(otherUser)
+        // Provide a starting point for comparison, if you want to listen to the data from scratch
+        dataProvider.setData([], cacheKey: cacheKey)
     }
     
     required init?(coder aDecoder: NSCoder) {
@@ -55,6 +57,7 @@ class MessagesViewController: UIViewController, CollectionDataProviderDelegate, 
 
         // We're going to do two things in parallel - access the cache and the network.
         // RocketData ensures there is no race condition here. If the cache returns after the network, the cache result is automatically discarded.
+        // The callback of this method needs to call `self.tableView.reloadData()` method, beacuse its internal implementations do not necessarily trigger `dataProvider.setData` method calls.
         dataProvider.fetchDataFromCache(withCacheKey: cacheKey) { (_, _) in
             self.tableView.reloadData()
         }
@@ -63,7 +66,6 @@ class MessagesViewController: UIViewController, CollectionDataProviderDelegate, 
             NetworkManager.fetchMessage(user) { (models, error) in
                 if error == nil {
                     self.dataProvider.setData(models, cacheKey: self.cacheKey)
-                    self.tableView.reloadData()
                 }
             }
         }
@@ -77,8 +79,6 @@ class MessagesViewController: UIViewController, CollectionDataProviderDelegate, 
         let newMessageId = NetworkManager.nextMessageId()
         let message = MessageModel(id: newMessageId, text: "hey", sender: loggedInUser)
         dataProvider.append([message])
-
-        tableView.reloadData()
     }
 
     // MARK: - TableView
@@ -114,5 +114,6 @@ class MessagesViewController: UIViewController, CollectionDataProviderDelegate, 
         // This will be called whenever one of the models changes. In our case, this happens whenever someone comes online/offline.
         // Optional: Use collectionChanges to do tableview animations
         self.tableView.reloadData()
+        print("test: collectionDataProviderHasUpdatedData")
     }
 }

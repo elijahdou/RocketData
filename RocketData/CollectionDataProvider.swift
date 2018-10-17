@@ -129,16 +129,17 @@ open class CollectionDataProvider<T: SimpleModel>: ConsistencyManagerListener, B
      anything else you want.
      */
     open func setData(_ data: [T], cacheKey: String?, shouldCache: Bool = true, context: Any? = nil) {
-        let isSuccess = self.dataHolder.setData(data, changeTime: ChangeTime())
-        if !isSuccess {
+        let hasConflict = dataHolder.lastUpdated.after(ChangeTime())
+        if hasConflict {
             return
         }
+        
         self.cacheKey = cacheKey
         if shouldCache, let cacheKey = cacheKey {
             dataModelManager.cacheCollection(data, forKey: cacheKey, context: context)
         }
 
-        updateAndListenToNewModelsInConsistencyManager(context: context)
+        updateAndListenToNewModelsInConsistencyManager(data, context: context)
         // Update all shared collections
         if let cacheKey = cacheKey {
             dataModelManager.sharedCollectionManager.siblingProvidersForProvider(self, cacheKey: cacheKey).forEach { provider in
@@ -239,15 +240,15 @@ open class CollectionDataProvider<T: SimpleModel>: ConsistencyManagerListener, B
     */
     open func insert(_ newData: [T], at index: Int, shouldCache: Bool = true, context: Any? = nil) {
         if newData.count > 0 {
-            var updatedData = data
-            updatedData.insert(contentsOf: newData, at: index)
-            let isSuccess = dataHolder.setData(updatedData, changeTime: ChangeTime())
-            if !isSuccess {
+            let hasConflict = dataHolder.lastUpdated.after(ChangeTime())
+            if hasConflict {
                 return
             }
+            var updatedData = data
+            updatedData.insert(contentsOf: newData, at: index)
             
             if shouldCache, let cacheKey = cacheKey {
-                dataModelManager.cacheCollection(data, forKey: cacheKey, context: context)
+                dataModelManager.cacheCollection(updatedData, forKey: cacheKey, context: context)
             }
 
             // Update all shared collections
@@ -262,7 +263,7 @@ open class CollectionDataProvider<T: SimpleModel>: ConsistencyManagerListener, B
             // Next, we actually need to do two things:
             // - Update the whole collection. This will actually only affect paused collections because all the other collections were updated above.
             // - Update all the new models. This will update all the models individually and possibly cause other rows in the current collection to update.
-            updateAndListenToNewModelsInConsistencyManager(context: context)
+            updateAndListenToNewModelsInConsistencyManager(updatedData, context: context)
             // NOTE: No cache key here, because this is just updating all the new models
             let newModelsBatchModel = batchModelFromModels(newData, cacheKey: nil)
             dataModelManager.consistencyManager.updateModel(newModelsBatchModel, context: ConsistencyContextWrapper(context: context))
@@ -289,15 +290,15 @@ open class CollectionDataProvider<T: SimpleModel>: ConsistencyManagerListener, B
      - parameter context: This context will be passed onto the cache delegate. Default nil.
      */
     open func update(_ element: T, at index: Int, shouldCache: Bool = true, context: Any? = nil) {
-        var updatedData = data
-        updatedData[index] = element
-        let isSuccess = dataHolder.setData(updatedData, changeTime: ChangeTime())
-        if !isSuccess {
+        let hasConflict = dataHolder.lastUpdated.after(ChangeTime())
+        if hasConflict {
             return
         }
+        var updatedData = data
+        updatedData[index] = element
 
         if shouldCache, let cacheKey = cacheKey {
-            self.dataModelManager.cacheCollection(data, forKey: cacheKey, context: context)
+            self.dataModelManager.cacheCollection(updatedData, forKey: cacheKey, context: context)
         }
 
         // Update all shared collections
@@ -311,7 +312,7 @@ open class CollectionDataProvider<T: SimpleModel>: ConsistencyManagerListener, B
         // Next, we actually need to do two things:
         // - Update the whole collection. This will actually only affect paused collections because all the other collections were updated above.
         // - Update the new model. This will possibly cause other rows in the current collection to update.
-        updateAndListenToNewModelsInConsistencyManager(context: context)
+        updateAndListenToNewModelsInConsistencyManager(updatedData, context: context)
         dataModelManager.consistencyManager.updateModel(element, context: ConsistencyContextWrapper(context: context))
     }
 
@@ -323,20 +324,20 @@ open class CollectionDataProvider<T: SimpleModel>: ConsistencyManagerListener, B
      - parameter context: This context will be passed onto the cache delegate. Default nil.
      */
     open func remove(at index: Int, shouldCache: Bool = true, context: Any? = nil) {
-        var updatedData = data
-        updatedData.remove(at: index)
-        let isSuccess = dataHolder.setData(updatedData, changeTime: ChangeTime())
-        if !isSuccess {
+        let hasConflict = dataHolder.lastUpdated.after(ChangeTime())
+        if hasConflict {
             return
         }
+        var updatedData = data
+        updatedData.remove(at: index)
 
         if shouldCache, let cacheKey = cacheKey {
-            dataModelManager.cacheCollection(data, forKey: cacheKey, context: context)
+            dataModelManager.cacheCollection(updatedData, forKey: cacheKey, context: context)
         }
 
         // No need to relisten because we know we don't have any new models
         // Any updates to the removed model will be ignored automatically
-        updateAndListenToNewModelsInConsistencyManager(context: context, shouldListen: false)
+        updateAndListenToNewModelsInConsistencyManager(updatedData, context: context, shouldListen: false)
 
         // Update all shared collections
         if let cacheKey = cacheKey {
@@ -543,12 +544,12 @@ open class CollectionDataProvider<T: SimpleModel>: ConsistencyManagerListener, B
     /**
      Updates an array of models in the consistency manager and relistens to these new models.
      */
-    private func updateAndListenToNewModelsInConsistencyManager(context: Any?, shouldListen: Bool = true) {
-        let batchModel = batchModelFromModels(data, cacheKey: cacheKey)
-        dataModelManager.consistencyManager.updateModel(batchModel, context: ConsistencyContextWrapper(context: context))
+    private func updateAndListenToNewModelsInConsistencyManager(_ newModel: [T], context: Any?, shouldListen: Bool = true) {
+        let batchModel = batchModelFromModels(newModel, cacheKey: cacheKey)
         if shouldListen {
             listenForUpdates(model: batchModel)
         }
+        dataModelManager.consistencyManager.updateModel(batchModel, context: ConsistencyContextWrapper(context: context))
     }
 
     /**

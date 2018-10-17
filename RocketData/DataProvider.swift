@@ -129,13 +129,13 @@ open class DataProvider<T: SimpleModel>: ConsistencyManagerListener, BatchListen
      or anything else you want.
     */
     open func setData(_ data: T?, updateCache: Bool = true, context: Any? = nil) {
-        let isSuccess = self.dataHolder.setData(data, changeTime: ChangeTime())
-        if !isSuccess {
+        let hasConflict = dataHolder.lastUpdated.after(ChangeTime())
+        if hasConflict {
             return
         }
         
         if let data = data {
-            if let cacheKey = data.modelIdentifier , updateCache {
+            if let cacheKey = data.modelIdentifier, updateCache {
                 dataModelManager.cacheModel(data, forKey: cacheKey, context: context)
             }
             // These need to be called every time the model changes
