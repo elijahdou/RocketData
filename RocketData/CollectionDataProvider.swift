@@ -155,12 +155,12 @@ open class CollectionDataProvider<T: SimpleModel>: ConsistencyManagerListener, B
 
      - parameter cacheKey: The cache key to use to fetch the item. Can be nil (it will still attempt a cache lookup using the context).
      Setting this will reset the cache key of this data provider.
+     - parameter policy: Default .replace. The policy how to merge current data with data read from cache.
      - parameter context: Default nil. This context is passed to the cacheDelegate when making the query.
      - parameter completion: Called on the main thread. This is called with the result from the cache.
      At this point, the data provider will already have new data, so there's no need to call setData.
     */
-    open func fetchDataFromCache(withCacheKey cacheKey: String?, context: Any? = nil, completion: @escaping ([T]?, NSError?)->()) {
-
+    open func fetchDataFromCache(withCacheKey cacheKey: String?, policy: CachedDataReadingPolicy = .replace, context: Any? = nil, completion: @escaping ([T]?, NSError?)->()) {
         guard cacheKey != self.cacheKey else {
             // If the cacheKey is the same as what we currently have, there's no point in fetching again from the cache
             // Our 'cached' model is already in memory and is our current model, so let's return it
@@ -172,7 +172,13 @@ open class CollectionDataProvider<T: SimpleModel>: ConsistencyManagerListener, B
         // This will be faster and help ensure consistency
         if let cacheKey = cacheKey,
             let data: DataHolder<[T]> = dataModelManager.sharedCollectionManager.dataFromProviders(cacheKey: cacheKey) {
-                self.dataHolder = data
+                let mergedData = self.mergeColletionData(current: self.data, cached: data.data, policy: policy)
+                var dataHolder = data
+                let isSuccess = dataHolder.setData(mergedData, changeTime: ChangeTime())
+                if !isSuccess {
+                    return
+                }
+                self.dataHolder = dataHolder
                 self.listenForUpdates()
                 self.cacheKey = cacheKey
                 completion(data.data, nil)
@@ -184,7 +190,13 @@ open class CollectionDataProvider<T: SimpleModel>: ConsistencyManagerListener, B
                 // Let's check again because otherwise, we may get out of sync
                 if let cacheKey = cacheKey,
                     let data: DataHolder<[T]> = self.dataModelManager.sharedCollectionManager.dataFromProviders(cacheKey: cacheKey) {
-                        self.dataHolder = data
+                        let mergedData = self.mergeColletionData(current: self.data, cached: data.data, policy: policy)
+                        var dataHolder = data
+                        let isSuccess = dataHolder.setData(mergedData, changeTime: ChangeTime())
+                        if !isSuccess {
+                            return
+                        }
+                        self.dataHolder = dataHolder
                         self.listenForUpdates()
                         self.cacheKey = cacheKey
                         completion(data.data, nil)
@@ -196,7 +208,8 @@ open class CollectionDataProvider<T: SimpleModel>: ConsistencyManagerListener, B
 
                     if cacheKey != self.cacheKey && cacheDataFresh {
                         if let collection = collection {
-                            let isSuccess = self.dataHolder.setData(collection, changeTime: ChangeTime())
+                            let mergedData = self.mergeColletionData(current: self.data, cached: collection, policy: policy)
+                            let isSuccess = self.dataHolder.setData(mergedData, changeTime: ChangeTime())
                             // If the method such as setData is not called from the main thread, there may still be conflicts. If so, just return
                             if !isSuccess {
                                 return
@@ -590,6 +603,25 @@ open class CollectionDataProvider<T: SimpleModel>: ConsistencyManagerListener, B
             } else {
                 dataModelManager.consistencyManager.addListener(self)
             }
+        }
+    }
+    
+    /**
+     Merge current data and the data read from cache
+     
+     - parameter current: Current data in memory.
+     - parameter cached: The data read from cache.
+     - parameter policy: Data merge policy.
+     - Returns: Merged data.
+     */
+    private func mergeColletionData(current: [T], cached: [T], policy: CachedDataReadingPolicy) -> [T] {
+        switch policy {
+        case .replace:
+            return cached
+        case .append:
+            return current + cached
+        case .front:
+            return cached + current
         }
     }
 }

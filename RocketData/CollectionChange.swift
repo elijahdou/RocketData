@@ -112,3 +112,18 @@ public extension Collection where Iterator.Element == CollectionChangeInformatio
         return numberOfInsertedElements() - numberOfDeletedElements()
     }
 }
+
+/**
+ This object represents an action determine how to merge current data in colletion data provider and data read from cache.
+ */
+public enum CachedDataReadingPolicy: Int {
+    
+    /// This indicates that data read from cache will replace current data in collection data provider.
+    case replace
+    
+    /// This indicates that data read from cache will append to current data in collection data provider.
+    case append
+    
+    /// This indicates that data read from cache will insert to front of current data in collection data provider.
+    case front
+}
