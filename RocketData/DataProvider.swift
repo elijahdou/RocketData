@@ -129,8 +129,8 @@ open class DataProvider<T: SimpleModel>: ConsistencyManagerListener, BatchListen
      or anything else you want.
     */
     open func setData(_ data: T?, updateCache: Bool = true, context: Any? = nil) {
-        let hasConflict = dataHolder.lastUpdated.after(ChangeTime())
-        if hasConflict {
+        let isSuccess = self.dataHolder.setData(data, changeTime: ChangeTime())
+        if !isSuccess {
             return
         }
         

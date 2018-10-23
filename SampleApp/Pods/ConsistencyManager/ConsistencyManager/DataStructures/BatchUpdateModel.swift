@@ -30,7 +30,7 @@ public final class BatchUpdateModel: ConsistencyManagerModel {
     public let models: [ConsistencyManagerModel?]
 
     /// The modelIdentifier for this BatchUpdateModel. This can be used to keep two BatchUpdateModels consistent.
-    public let modelIdentifier: String?
+    public private(set) var modelIdentifier: String?
 
     /**
      - parameter models: The models you want to listen to or update.
@@ -54,6 +54,10 @@ public final class BatchUpdateModel: ConsistencyManagerModel {
      */
     public init(models: [ConsistencyManagerModel?], modelIdentifier: String? = nil) {
         self.models = models
+        self.modelIdentifier = modelIdentifier
+    }
+    
+    public func setupModelIdentifier(modelIdentifier: String?) {
         self.modelIdentifier = modelIdentifier
     }
 

@@ -32,3 +32,15 @@ extension CollectionDataProvider {
         self.init(dataModelManager: DataModelManager.sharedInstance)
     }
 }
+
+extension CollectionDataProvider {
+    convenience init(cacheKey: String) {
+        self.init(dataModelManager: DataModelManager.sharedInstance, cacheKey: cacheKey)
+    }
+}
+
+extension CollectionDataProvider {
+    convenience init(fromSharedCollection cacheKey: String) {
+        self.init(dataModelManager: DataModelManager.sharedInstance, fromSharedCollection: cacheKey)
+    }
+}

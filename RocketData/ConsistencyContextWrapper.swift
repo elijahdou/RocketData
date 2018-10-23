@@ -18,9 +18,12 @@ class ConsistencyContextWrapper {
 
     let context: Any?
     let creationDate: ChangeTime = ChangeTime()
+    let collectionChagnge: CollectionChange?
+    
 
-    init(context: Any?) {
+    init(context: Any?, collectionChagnge: CollectionChange = .reset) {
         self.context = context
+        self.collectionChagnge = collectionChagnge
     }
 
     /**
